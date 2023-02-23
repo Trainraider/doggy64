@@ -1,0 +1,76 @@
+#!/bin/env python3
+
+import argparse
+import sys, io
+from base64 import b64decode, b64encode
+
+DOG_WORDS = [
+    "woof","wooof","woooof","arf","arrf","arrrf","arrrrf",
+    "bow-wow","yap","yip","ruff","wuff","bark","baark",
+    "barrk","baaark","yaff","yaaff","howl","bay","bork",
+    "blat","yelp","whuff","huff","aroo","gruff",
+    "rrrr","rrr","rrrrr","grrrrr","grrrr","grrr","grr",
+    "snarl","roar","grumble","groan","murmur","mutter","whine",
+    "wimper","whinge","snivel","moan","pant",
+    "puff","wheeze","snort","snuffle","sniffle","sniff","scratch",
+    "lick","chew","gnaw","wag", "awooo", "waggling", "chuffing",
+    "yarf", "yarr", "growf", "womp" 
+]
+
+B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+B64_TO_DOGGY64 = dict(zip(B64_CHARS, DOG_WORDS))
+DOGGY64_TO_B64 = dict(zip(DOG_WORDS, B64_CHARS))
+
+def doggy64_decode(encoded_bytes):
+    encoded_bytes = encoded_bytes.decode()
+    b64_str = ''.join([DOGGY64_TO_B64[w] for w in encoded_bytes.split()])
+    b64_str = b64_str.ljust(len(b64_str) + (4 - len(b64_str) % 4), '=')
+    return b64decode(b64_str)
+
+def doggy64_encode(raw_bytes):
+    b64_str = b64encode(raw_bytes).decode().rstrip('=')
+    doggy64_str = ''.join([f"{B64_TO_DOGGY64[c]} " for c in b64_str])
+    return doggy64_str.encode()
+
+def main():
+    parser = argparse.ArgumentParser(description='Doggy64 encoder/decoder')
+    decode_group = parser.add_mutually_exclusive_group(required=True)
+    decode_group.add_argument('-e', '--encode', action='store_true', help='Encode data with Doggy64')
+    decode_group.add_argument('-d', '--decode', action='store_true', help='Decode Doggy64 data')
+    newline_group = parser.add_mutually_exclusive_group()
+    newline_group.add_argument('-l', '--line-ending', dest='line_ending', action='store_true', help='Include a final line ending')
+    newline_group.add_argument('-L', '--no-line-ending', dest='line_ending', action='store_false', help='Do not include a final line ending')
+    parser.set_defaults(line_ending=None)
+    parser.add_argument('-f', '--file', dest='input_file', type=argparse.FileType('rb'), help='Input file to work with')
+    parser.add_argument('-o', '--output', dest='output_file', type=argparse.FileType('wb'), help='Output file to write result to')
+    parser.add_argument('input', nargs='?', default=sys.stdin, help= 'Input data to work with')
+    args = parser.parse_args()
+
+    if args.input_file is not None:
+        input = args.input_file.read()
+    elif isinstance(args.input, bytes):
+        input = args.input
+    elif isinstance(args.input, io.TextIOWrapper):
+        input = args.input.detach().read()
+    else:
+        input = args.input.encode()
+
+    if args.line_ending is not None:
+        line_ending = args.line_ending
+    elif args.output_file is not None:
+        line_ending = False
+    else:
+        line_ending = sys.stdout.isatty()
+
+    output = doggy64_encode(input) if args.encode else doggy64_decode(input)
+    if line_ending:
+        output += b"\n"
+    
+    if args.output_file is not None:
+        args.output_file.write(output)
+    else:
+        sys.stdout.buffer.write(output)
+
+if __name__ == '__main__':
+    main()
